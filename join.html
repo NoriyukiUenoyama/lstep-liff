@@ -173,10 +173,9 @@
     </div>
 
     <script>
-        // URLパラメータからグループキーとLIFF IDを取得
+        // URLパラメータからグループキーを取得
         const urlParams = new URLSearchParams(window.location.search);
         const groupKey = urlParams.get('group');
-        const liffId = urlParams.get('liff_id');
         const debug = urlParams.get('debug') === '1';
 
         // 設定（GitHub Pagesからの相対パス）
@@ -184,6 +183,7 @@
 
         // API Base URL（config.jsonから取得）
         let API_BASE = '';
+        let liffId = '';
 
         // 状態表示の切り替え
         function showState(stateId) {
@@ -228,6 +228,17 @@
             }
         }
 
+        // グループからLIFF IDを取得
+        async function fetchLiffId(groupKey) {
+            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/liff-id`);
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || 'LIFF IDの取得に失敗しました');
+            }
+            const data = await res.json();
+            return data.liffId;
+        }
+
         // 登録状況チェック
         async function checkRegistration(groupKey, userId) {
             const res = await fetch(`${API_BASE}/api/groups/${groupKey}/check-registration?userId=${userId}`);
@@ -247,14 +258,17 @@
                     return;
                 }
 
-                // LIFF IDチェック
+                // 設定を読み込み
+                const config = await loadConfig();
+                showDebug({ groupKey, apiBaseUrl: API_BASE });
+
+                // APIからLIFF IDを取得
+                liffId = await fetchLiffId(groupKey);
                 if (!liffId) {
-                    showError('LIFF IDが指定されていません');
+                    showError('このグループにはLIFF IDが設定されていません');
                     return;
                 }
 
-                // 設定を読み込み
-                const config = await loadConfig();
                 showDebug({ groupKey, liffId, apiBaseUrl: API_BASE });
 
                 // LIFF初期化
@@ -271,7 +285,7 @@
                 const userId = profile.userId;
                 const displayName = profile.displayName;
 
-                showDebug({ userId, displayName, groupKey, apiBaseUrl: API_BASE });
+                showDebug({ userId, displayName, groupKey, liffId, apiBaseUrl: API_BASE });
 
                 // 登録状況チェック
                 const checkResult = await checkRegistration(groupKey, userId);
