@@ -173,10 +173,47 @@
     </div>
 
     <script>
-        // URLパラメータからグループキーを取得
-        const urlParams = new URLSearchParams(window.location.search);
-        const groupKey = urlParams.get('group');
-        const debug = urlParams.get('debug') === '1';
+        // URLパラメータからグループキーを取得（複数ソースをチェック）
+        function getGroupKey() {
+            // 1. 通常のURLパラメータ
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('group')) {
+                return urlParams.get('group');
+            }
+
+            // 2. liff.stateから取得（ログインリダイレクト後）
+            const state = urlParams.get('liff.state');
+            if (state) {
+                const stateParams = new URLSearchParams(state);
+                if (stateParams.get('group')) {
+                    return stateParams.get('group');
+                }
+            }
+
+            // 3. hashから取得（フォールバック）
+            if (window.location.hash) {
+                const hashParams = new URLSearchParams(window.location.hash.substring(1));
+                if (hashParams.get('group')) {
+                    return hashParams.get('group');
+                }
+            }
+
+            return null;
+        }
+
+        function isDebugMode() {
+            const urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.get('debug') === '1') return true;
+            const state = urlParams.get('liff.state');
+            if (state) {
+                const stateParams = new URLSearchParams(state);
+                if (stateParams.get('debug') === '1') return true;
+            }
+            return false;
+        }
+
+        let groupKey = getGroupKey();
+        let debug = isDebugMode();
 
         // 設定（GitHub Pagesからの相対パス）
         const CONFIG_URL = './config.json';
@@ -202,10 +239,21 @@
             }
         }
 
-        // エラー表示
-        function showError(message) {
+        // エラー表示（常にデバッグ情報を表示）
+        function showError(message, extraInfo = {}) {
             document.getElementById('errorMessage').textContent = message;
             showState('errorState');
+            // エラー時は常にデバッグ情報を表示
+            const debugEl = document.getElementById('debugInfo');
+            debugEl.classList.remove('hidden');
+            debugEl.textContent = JSON.stringify({
+                error: message,
+                url: window.location.href,
+                search: window.location.search,
+                hash: window.location.hash,
+                groupKey: groupKey,
+                ...extraInfo
+            }, null, 2);
         }
 
         // 設定を読み込み
