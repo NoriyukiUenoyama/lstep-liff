@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>友だち登録</title>
+    <script src="https://static.line-scdn.net/liff/edge/2/sdk.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #06c755 0%, #00b900 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 40px 30px;
+            max-width: 360px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+        }
+        .icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #06c755;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .icon svg {
+            width: 40px;
+            height: 40px;
+            fill: white;
+        }
+        .icon.error {
+            background: #ff6b6b;
+        }
+        .icon.already {
+            background: #ffc107;
+        }
+        h1 {
+            font-size: 20px;
+            color: #333;
+            margin-bottom: 12px;
+        }
+        .message {
+            color: #666;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 24px;
+        }
+        .account-name {
+            display: inline-block;
+            background: #f0f0f0;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: bold;
+            color: #333;
+            margin: 10px 0;
+        }
+        .loading {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 16px;
+        }
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #06c755;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .btn {
+            display: inline-block;
+            background: #06c755;
+            color: white;
+            padding: 14px 40px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-size: 16px;
+            font-weight: bold;
+            transition: background 0.2s;
+        }
+        .btn:hover {
+            background: #05a847;
+        }
+        .btn-secondary {
+            background: #666;
+        }
+        .btn-secondary:hover {
+            background: #555;
+        }
+        .hidden {
+            display: none;
+        }
+        .debug {
+            margin-top: 20px;
+            padding: 10px;
+            background: #f5f5f5;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #999;
+            text-align: left;
+            word-break: break-all;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- ローディング状態 -->
+        <div id="loadingState" class="loading">
+            <div class="spinner"></div>
+            <p class="message">読み込み中...</p>
+        </div>
+
+        <!-- 登録可能状態 -->
+        <div id="readyState" class="hidden">
+            <div class="icon">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+            </div>
+            <h1>友だち登録</h1>
+            <p class="message">
+                下のボタンをタップして<br>友だち登録してください
+            </p>
+            <div class="account-name" id="accountName"></div>
+            <br><br>
+            <a href="#" class="btn" id="addFriendBtn">友だち追加</a>
+        </div>
+
+        <!-- 既に登録済み状態 -->
+        <div id="alreadyState" class="hidden">
+            <div class="icon already">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            </div>
+            <h1>登録済みです</h1>
+            <p class="message">
+                既に友だち登録されています
+            </p>
+            <div class="account-name" id="registeredAccountName"></div>
+            <br><br>
+            <a href="#" class="btn btn-secondary" id="closeBtn">閉じる</a>
+        </div>
+
+        <!-- エラー状態 -->
+        <div id="errorState" class="hidden">
+            <div class="icon error">
+                <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            </div>
+            <h1>エラー</h1>
+            <p class="message" id="errorMessage">エラーが発生しました</p>
+            <a href="#" class="btn btn-secondary" id="retryBtn">再試行</a>
+        </div>
+
+        <!-- デバッグ情報 -->
+        <div id="debugInfo" class="debug hidden"></div>
+    </div>
+
+    <script>
+        // URLパラメータからグループキーとLIFF IDを取得
+        const urlParams = new URLSearchParams(window.location.search);
+        const groupKey = urlParams.get('group');
+        const liffId = urlParams.get('liff_id');
+        const debug = urlParams.get('debug') === '1';
+
+        // 設定（GitHub Pagesからの相対パス）
+        const CONFIG_URL = './config.json';
+
+        // API Base URL（config.jsonから取得）
+        let API_BASE = '';
+
+        // 状態表示の切り替え
+        function showState(stateId) {
+            ['loadingState', 'readyState', 'alreadyState', 'errorState'].forEach(id => {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById(stateId).classList.remove('hidden');
+        }
+
+        // デバッグ情報表示
+        function showDebug(info) {
+            if (debug) {
+                const debugEl = document.getElementById('debugInfo');
+                debugEl.classList.remove('hidden');
+                debugEl.textContent = JSON.stringify(info, null, 2);
+            }
+        }
+
+        // エラー表示
+        function showError(message) {
+            document.getElementById('errorMessage').textContent = message;
+            showState('errorState');
+        }
+
+        // 設定を読み込み
+        async function loadConfig() {
+            try {
+                const res = await fetch(CONFIG_URL + '?t=' + Date.now()); // キャッシュ回避
+                if (!res.ok) {
+                    throw new Error('設定ファイルの読み込みに失敗');
+                }
+                const config = await res.json();
+                API_BASE = config.apiBaseUrl;
+
+                if (!API_BASE || API_BASE === 'http://localhost:3000') {
+                    throw new Error('APIサーバーが設定されていません');
+                }
+
+                return config;
+            } catch (err) {
+                throw new Error('設定読み込みエラー: ' + err.message);
+            }
+        }
+
+        // 登録状況チェック
+        async function checkRegistration(groupKey, userId) {
+            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/check-registration?userId=${userId}`);
+            if (!res.ok) {
+                const data = await res.json();
+                throw new Error(data.error || '登録チェックに失敗しました');
+            }
+            return await res.json();
+        }
+
+        // メイン処理
+        async function main() {
+            try {
+                // グループキーチェック
+                if (!groupKey) {
+                    showError('グループが指定されていません');
+                    return;
+                }
+
+                // LIFF IDチェック
+                if (!liffId) {
+                    showError('LIFF IDが指定されていません');
+                    return;
+                }
+
+                // 設定を読み込み
+                const config = await loadConfig();
+                showDebug({ groupKey, liffId, apiBaseUrl: API_BASE });
+
+                // LIFF初期化
+                await liff.init({ liffId: liffId });
+
+                // ログインチェック
+                if (!liff.isLoggedIn()) {
+                    liff.login({ redirectUri: window.location.href });
+                    return;
+                }
+
+                // プロフィール取得
+                const profile = await liff.getProfile();
+                const userId = profile.userId;
+                const displayName = profile.displayName;
+
+                showDebug({ userId, displayName, groupKey, apiBaseUrl: API_BASE });
+
+                // 登録状況チェック
+                const checkResult = await checkRegistration(groupKey, userId);
+
+                if (checkResult.registered) {
+                    // 既に登録済み
+                    document.getElementById('registeredAccountName').textContent = checkResult.accountName || '登録済みアカウント';
+                    showState('alreadyState');
+
+                    document.getElementById('closeBtn').addEventListener('click', (e) => {
+                        e.preventDefault();
+                        liff.closeWindow();
+                    });
+                } else {
+                    // 未登録 - 友だち追加URLへ
+                    document.getElementById('accountName').textContent = checkResult.accountName || '';
+                    document.getElementById('addFriendBtn').href = checkResult.redirectUrl;
+                    showState('readyState');
+
+                    document.getElementById('addFriendBtn').addEventListener('click', (e) => {
+                        if (liff.isInClient()) {
+                            e.preventDefault();
+                            liff.openWindow({
+                                url: checkResult.redirectUrl,
+                                external: false
+                            });
+                        }
+                    });
+                }
+
+            } catch (err) {
+                console.error('Error:', err);
+                showError(err.message || 'エラーが発生しました');
+                showDebug({ error: err.message, stack: err.stack });
+            }
+        }
+
+        // 再試行ボタン
+        document.getElementById('retryBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            showState('loadingState');
+            main();
+        });
+
+        // 起動
+        main();
+    </script>
+</body>
+</html>
