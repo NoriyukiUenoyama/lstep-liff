@@ -276,9 +276,16 @@
             }
         }
 
+        // ngrok無料版の警告ページをスキップするヘッダー
+        const ngrokHeaders = {
+            'ngrok-skip-browser-warning': 'true'
+        };
+
         // グループからLIFF IDを取得
         async function fetchLiffId(groupKey) {
-            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/liff-id`);
+            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/liff-id`, {
+                headers: ngrokHeaders
+            });
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || 'LIFF IDの取得に失敗しました');
@@ -289,7 +296,9 @@
 
         // 登録状況チェック
         async function checkRegistration(groupKey, userId) {
-            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/check-registration?userId=${userId}`);
+            const res = await fetch(`${API_BASE}/api/groups/${groupKey}/check-registration?userId=${userId}`, {
+                headers: ngrokHeaders
+            });
             if (!res.ok) {
                 const data = await res.json();
                 throw new Error(data.error || '登録チェックに失敗しました');
